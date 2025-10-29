@@ -38,13 +38,13 @@
 #>
 
 # Requires PowerShell 5.1+
-$ErrorActionPreference = 'Stop'
-
 param(
     [string]$GeneratorPath,
     [switch]$Debug,
     [string]$WorkingDirectory
 )
+
+$ErrorActionPreference = 'Stop'
 
 # Set default values if not provided
 if (-not $GeneratorPath) {
