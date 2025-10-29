@@ -2,8 +2,6 @@
 
 [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ahmed98Osama/Steam-acf-generator/blob/master/GenerateACF_Colab.ipynb)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/ahmed98Osama/Steam-acf-generator)
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/ahmed98Osama/Steam-acf-generator)
-[![Run on Replit](https://replit.com/badge/github/ahmed98Osama/Steam-acf-generator)](https://replit.com/github/ahmed98Osama/Steam-acf-generator)
 
 A powerful PowerShell script and Google Colab Python script for generating Steam App Configuration Files (ACF) using SKSAppManifestGenerator.
 
@@ -54,15 +52,13 @@ A powerful PowerShell script and Google Colab Python script for generating Steam
 
 - `generate_acf_colab.py` (Python script)
   - Same logic as the notebook but as a Python file.
-  - Useful for cloud IDEs (Codespaces/Gitpod/Replit) or local Python. Note: Running the Windows `.exe` on Linux requires Wine.
+  - Useful for cloud IDEs or local Python. Note: Running the Windows `.exe` on Linux requires Wine.
   - File path: [`generate_acf_colab.py`](./generate_acf_colab.py)
 
 ## 🚀 Run Options (Buttons)
 
 - Open the self-contained Colab notebook: [Open in Colab](https://colab.research.google.com/github/ahmed98Osama/Steam-acf-generator/blob/master/GenerateACF_Colab.ipynb)
 - Launch an online dev environment via Codespaces: [Open in Codespaces](https://codespaces.new/ahmed98Osama/Steam-acf-generator)
-- Open in Gitpod (cloud IDE): [Open in Gitpod](https://gitpod.io/#https://github.com/ahmed98Osama/Steam-acf-generator)
-- Run online on Replit (Python workflows): [Run on Replit](https://replit.com/github/ahmed98Osama/Steam-acf-generator)
 
 > Notes:
 > - Colab/Linux runs the generator via Wine when possible; the tool itself is Windows-only.
@@ -71,7 +67,7 @@ A powerful PowerShell script and Google Colab Python script for generating Steam
 ## 🔧 Prerequisites
 
 - **PowerShell 5.1 or later** (for Windows usage of `GenerateACF.ps1`)
-- **Python 3.8+** (for `generate_acf_colab.py` in Codespaces/Gitpod/Replit/local)
+- **Python 3.8+** (for `generate_acf_colab.py` if running locally)
 - **Internet connection** (for automatic tool download)
 
 ## 🚀 PowerShell Script Usage
@@ -180,13 +176,40 @@ What you get:
 
 Target script: [`generate_acf_colab.py`](./generate_acf_colab.py)
 
-Run locally or in a cloud IDE:
+Run locally:
 ```bash
 python generate_acf_colab.py
 ```
 Notes:
 - The generator is a Windows executable. On Linux/macOS, install Wine or prefer the PowerShell script on Windows.
 - Behavior matches the notebook (same download logic, validation, and execution).
+
+## 📦 Upstream Tool Capabilities (SKSAppManifestGenerator)
+
+This project wraps the upstream SKSAppManifestGenerator tool. For detailed history, fixes, and behavior changes, see the official changelog:
+
+- Changelog: [SKSAppManifestGenerator CHANGELOG.md](https://github.com/Sak32009/SKSAppManifestGenerator/blob/main/CHANGELOG.md)
+
+### CLI usage (summarized)
+
+```
+SKSAppManifestGenerator_x64.exe [-h] [-d] appid [appid ...]
+
+positional arguments:
+  appid            One or more Steam App IDs
+
+optional arguments:
+  -h, --help       Show help message and exit
+  -d, --debug      Enable debug output (default: False)
+```
+
+### Behavior notes
+- Accepts one or more App IDs at once; the wrapper passes multiple IDs in batch.
+- When `--debug` is enabled, additional diagnostic output is printed; the wrapper exposes this as `-Debug` (PowerShell) and a checkbox (Colab).
+- Output file naming typically follows `appmanifest_<appid>.acf` (the wrapper post-checks with this and `<appid>.acf`).
+- The upstream repository is archived/read-only as of 2025, but binaries remain available and functional; see changelog for historical updates and changes.
+
+If you rely on a specific upstream behavior or version, consult the changelog entry for that release and pin your environment accordingly. The wrapper scripts are designed to be forward-compatible with the documented CLI surface.
 
 ## 📖 Parameters
 
@@ -294,31 +317,4 @@ Contributions are welcome! Feel free to submit pull requests.
 ---
 
 **Happy ACF Generating! 🎮**
-
-## 📦 Upstream Tool Capabilities (SKSAppManifestGenerator)
-
-This project wraps the upstream SKSAppManifestGenerator tool. For detailed history, fixes, and behavior changes, see the official changelog:
-
-- Changelog: [SKSAppManifestGenerator CHANGELOG.md](https://github.com/Sak32009/SKSAppManifestGenerator/blob/main/CHANGELOG.md)
-
-### CLI usage (summarized)
-
-```
-SKSAppManifestGenerator_x64.exe [-h] [-d] appid [appid ...]
-
-positional arguments:
-  appid            One or more Steam App IDs
-
-optional arguments:
-  -h, --help       Show help message and exit
-  -d, --debug      Enable debug output (default: False)
-```
-
-### Behavior notes
-- Accepts one or more App IDs at once; the wrapper passes multiple IDs in batch.
-- When `--debug` is enabled, additional diagnostic output is printed; the wrapper exposes this as `-Debug` (PowerShell) and a checkbox (Colab).
-- Output file naming typically follows `appmanifest_<appid>.acf` (the wrapper post-checks with this and `<appid>.acf`).
-- The upstream repository is archived/read-only as of 2025, but binaries remain available and functional; see changelog for historical updates and changes.
-
-If you rely on a specific upstream behavior or version, consult the changelog entry for that release and pin your environment accordingly. The wrapper scripts are designed to be forward-compatible with the documented CLI surface.
 
