@@ -50,6 +50,11 @@ def print_err(msg):
 def print_success(msg):
     print(f"{Colors.GREEN}[SUCCESS]{Colors.RESET} {msg}")
 
+def _progress_bar(pct: float, width: int = 30) -> str:
+    pct = max(0.0, min(100.0, pct))
+    filled = int(round((pct / 100.0) * width))
+    return '[' + ('#' * filled) + ('-' * (width - filled)) + ']'
+
 def show_welcome():
     """Display welcome message"""
     print("\n" + "=" * 50)
@@ -79,7 +84,8 @@ def download_file(url, output_path, timeout=600):
                     downloaded += len(chunk)
                     if total_size > 0:
                         percent = (downloaded / total_size) * 100
-                        print(f"\r  Progress: {percent:.1f}%", end='', flush=True)
+                        bar = _progress_bar(percent)
+                        print(f"\r  {bar} {percent:5.1f}%", end='', flush=True)
         print()  # New line after progress
         return True
     except Exception as e:
