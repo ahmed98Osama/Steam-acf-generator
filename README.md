@@ -70,6 +70,24 @@ A powerful PowerShell script and Google Colab Python script for generating Steam
 - **Python 3.8+** (for `generate_acf_colab.py` if running locally)
 - **Internet connection** (for automatic tool download)
 
+## 📦 Requirements Installation
+
+Install Python dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+On Linux (including Colab runtimes), install Wine before running the generator:
+
+```bash
+sudo apt-get update && sudo apt-get install -y wine wine64
+```
+
+Notes:
+- The notebook/script will also attempt to auto-install/verify Wine, but installing it up-front avoids first-run delays.
+- Wine is not required on Windows.
+
 ## 🚀 PowerShell Script Usage
 
 Target file: [`GenerateACF.ps1`](./GenerateACF.ps1)
