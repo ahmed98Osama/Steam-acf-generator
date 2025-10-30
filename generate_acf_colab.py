@@ -306,6 +306,12 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
         if wine_cmd:
             print_info(f"Using {wine_cmd} to run Windows executable.")
             cmd = [wine_cmd] + cmd
+        # Show the final command for transparency
+        try:
+            printable_cmd = ' '.join(cmd)
+        except Exception:
+            printable_cmd = str(cmd)
+        print_info(f"Command: {printable_cmd}")
         
         # Attempt to run
         try:
