@@ -18,6 +18,8 @@ import zipfile
 import subprocess
 import shutil
 from pathlib import Path
+import argparse
+import unicodedata
 
 # Configuration
 PRIMARY_URL = 'https://github.com/Sak32009/SKSAppManifestGenerator/releases/download/v2.0.3/SKSAppManifestGenerator_x64_v2.0.3.zip'
@@ -25,6 +27,7 @@ FALLBACK_URL = 'https://github.com/ahmed98Osama/Steam-acf-generator/raw/master/S
 TOOL_DIR = './tools/SKSAppManifestGenerator'
 TOOL_NAME = 'SKSAppManifestGenerator_x64.exe'
 TOOL_PATH = os.path.join(TOOL_DIR, TOOL_NAME)
+ZIP_PASSWORD = b'cs.rin.ru'
 
 # Colors for output
 class Colors:
@@ -58,11 +61,12 @@ def show_welcome():
     print("  Repository: https://github.com/Sak32009/SKSAppManifestGenerator")
     print("=" * 50 + "\n")
 
-def download_file(url, output_path):
+def download_file(url, output_path, timeout=600):
     """Download a file from URL"""
     try:
         print_info(f"Downloading from: {url}")
-        response = requests.get(url, stream=True)
+        headers = {"User-Agent": "Python-ACFDownloader/1.0"}
+        response = requests.get(url, stream=True, headers=headers, timeout=timeout)
         response.raise_for_status()
         
         total_size = int(response.headers.get('content-length', 0))
@@ -82,12 +86,19 @@ def download_file(url, output_path):
         print_warn(f"Download failed: {str(e)}")
         return False
 
-def extract_zip(zip_path, extract_to):
+def extract_zip(zip_path, extract_to, password: bytes | None = None):
     """Extract ZIP file"""
     try:
         print_info(f"Extracting {zip_path} to {extract_to}")
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_to)
+            if password:
+                try:
+                    zip_ref.extractall(extract_to, pwd=password)
+                except RuntimeError as re:
+                    print_warn(f"Passworded extraction failed ({re}); retrying without password...")
+                    zip_ref.extractall(extract_to)
+            else:
+                zip_ref.extractall(extract_to)
         return True
     except Exception as e:
         print_warn(f"Extraction failed: {str(e)}")
@@ -119,7 +130,7 @@ def setup_tool():
     print_info("Attempting download from primary source...")
     if download_file(PRIMARY_URL, temp_zip):
         os.makedirs(temp_extract, exist_ok=True)
-        if extract_zip(temp_zip, temp_extract):
+        if extract_zip(temp_zip, temp_extract, password=ZIP_PASSWORD):
             # Find the executable
             exe_path = find_executable(temp_extract)
             if exe_path:
@@ -140,23 +151,43 @@ def setup_tool():
     print_err("Failed to download tool from both sources")
     return None
 
+def convert_to_ascii_digits(text: str) -> str:
+    """Normalize any locale-specific digits to ASCII 0-9."""
+    if not text:
+        return text
+    normalized = []
+    for ch in text:
+        try:
+            dec = unicodedata.decimal(ch)
+            normalized.append(chr(ord('0') + int(dec)))
+        except Exception:
+            normalized.append(ch)
+    return ''.join(normalized)
+
+
+def extract_digits_only(text: str):
+    """Extract numeric sequences as tokens from text (drops non-digits)."""
+    if not text:
+        return []
+    text = convert_to_ascii_digits(text)
+    tokens = []
+    current = []
+    for ch in text:
+        if '0' <= ch <= '9':
+            current.append(ch)
+        elif current:
+            tokens.append(''.join(current))
+            current = []
+    if current:
+        tokens.append(''.join(current))
+    return tokens
+
+
 def validate_app_ids(app_ids_input):
     """Validate and normalize App IDs"""
     if not app_ids_input or not app_ids_input.strip():
         return []
-    
-    # Split by space or comma
-    tokens = app_ids_input.replace(',', ' ').split()
-    app_ids = []
-    
-    for token in tokens:
-        token = token.strip()
-        if token.isdigit():
-            app_ids.append(token)
-        elif token:
-            print_warn(f"Skipping invalid App ID: {token}")
-    
-    return app_ids
+    return extract_digits_only(app_ids_input)
 
 def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
     """Generate ACF files for given App IDs"""
@@ -195,7 +226,7 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
         
         # Attempt to run
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
             if result.returncode == 0:
                 print_success("ACF files generated successfully!")
                 print(result.stdout)
@@ -230,44 +261,70 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
     else:
         print_warn("No ACF files detected. Check generator output above.")
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Steam ACF Generator wrapper for SKSAppManifestGenerator")
+    parser.add_argument("--GeneratorPath", dest="generator_path", help="Path to SKSAppManifestGenerator_x64.exe")
+    parser.add_argument("-d", "--debug", action="store_true", help="Enable debug output")
+    parser.add_argument("--WorkingDirectory", dest="working_dir", help="Directory to output ACF files")
+    parser.add_argument("--AppId", dest="app_id", help="App IDs string; accepts spaces/commas/mixed separators and non-ASCII digits")
+    return parser.parse_args()
+
+
 def main():
     """Main function"""
     show_welcome()
-    
-    # Setup tool
+
+    args = parse_args()
+
+    global TOOL_PATH
+    if args.generator_path:
+        TOOL_PATH = args.generator_path
+
     tool_path = setup_tool()
     if not tool_path:
         print_err("Could not setup SKSAppManifestGenerator. Exiting.")
         sys.exit(1)
-    
-    # Get user input
+
+    has_cli = any([args.app_id, args.working_dir, args.debug, args.generator_path])
+
+    if has_cli:
+        debug = bool(args.debug)
+        working_dir = args.working_dir if args.working_dir else os.getcwd()
+        app_ids = validate_app_ids(args.app_id or "")
+        if not app_ids:
+            print_err("No valid App IDs provided via --AppId.")
+            sys.exit(1)
+        print(f"\n{Colors.GREEN}Valid App IDs:{Colors.RESET} {', '.join(app_ids)}")
+        print("\n" + "=" * 50)
+        generate_acf_files(tool_path, app_ids, debug, working_dir)
+        print("\n" + "=" * 50)
+        print_success("Process completed!")
+        print("=" * 50 + "\n")
+        return
+
     print("\n" + "=" * 50)
     print(f"{Colors.YELLOW}Configuration{Colors.RESET}")
     print("=" * 50)
-    
-    # Debug mode
+
     debug_input = input("\nEnable debug output? (Y/n): ").strip().lower()
     debug = debug_input in ('y', 'yes', '')
-    
-    # Working directory
+
     working_dir_input = input(f"\nWorking directory (current: {os.getcwd()}, press Enter to keep): ").strip()
     working_dir = working_dir_input if working_dir_input else os.getcwd()
-    
-    # App IDs
+
     print("\n" + "=" * 50)
-    app_ids_input = input("Enter one or more App IDs (space or comma separated): ")
+    app_ids_input = input("Enter one or more App IDs (space/comma/mixed separators allowed): ")
     app_ids = validate_app_ids(app_ids_input)
-    
+
     if not app_ids:
         print_err("No valid App IDs provided. Exiting.")
         sys.exit(1)
-    
+
     print(f"\n{Colors.GREEN}Valid App IDs:{Colors.RESET} {', '.join(app_ids)}")
-    
-    # Generate files
+
     print("\n" + "=" * 50)
     generate_acf_files(tool_path, app_ids, debug, working_dir)
-    
+
     print("\n" + "=" * 50)
     print_success("Process completed!")
     print("=" * 50 + "\n")

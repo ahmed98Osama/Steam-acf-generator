@@ -180,9 +180,26 @@ Run locally:
 ```bash
 python generate_acf_colab.py
 ```
+
+CLI parameters (parity with PowerShell):
+
+```bash
+python generate_acf_colab.py \
+  [--GeneratorPath "C:\\Path\\To\\SKSAppManifestGenerator_x64.exe"] \
+  [-d|--debug] \
+  [--WorkingDirectory "C:\\Steam\\ACF"] \
+  [--AppId "570 730, ٤٤٠"]
+```
+
+- **--AppId**: Accepts mixed separators and non-ASCII digits (e.g., Arabic-Indic); the script normalizes to ASCII before processing.
+- **--GeneratorPath**: Overrides the default tool location.
+- **--WorkingDirectory**: Where ACF files will be written.
+- **-d/--debug**: Enables debug output (passes `-d` to the generator).
+
 Notes:
-- The generator is a Windows executable. On Linux/macOS, install Wine or prefer the PowerShell script on Windows.
-- Behavior matches the notebook (same download logic, validation, and execution).
+- The upstream generator is Windows-only. On Linux/macOS, install Wine (the wrapper detects it and uses `wine`).
+- The primary ZIP download for SKSAppManifestGenerator v2.0.3 is password-protected; the wrapper automatically extracts with password `cs.rin.ru` and falls back to a direct EXE if needed.
+- Behavior matches the notebook (same download logic, validation, and execution), now aligned with the PowerShell script.
 
 ## 📦 Upstream Tool Capabilities (SKSAppManifestGenerator)
 
