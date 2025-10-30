@@ -191,6 +191,10 @@ def ensure_wine() -> str | None:
 
 def setup_tool():
     """Download and setup SKSAppManifestGenerator"""
+    # Ensure Wine is installed first on non-Windows systems before any downloads
+    if platform.system().lower() != 'windows':
+        ensure_wine()
+
     # Check if tool already exists
     if os.path.exists(TOOL_PATH):
         print_info(f"Tool found at: {TOOL_PATH}")
@@ -346,16 +350,18 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
     finally:
         os.chdir(original_dir)
     
-    # Check for generated files
+    # Check for generated files (search recursively to catch Wine subfolders)
     found_files = []
     for app_id in app_ids:
-        candidates = [
-            os.path.join(working_dir, f"appmanifest_{app_id}.acf"),
-            os.path.join(working_dir, f"{app_id}.acf")
-        ]
-        for candidate in candidates:
-            if os.path.exists(candidate):
-                found_files.append(candidate)
+        target_names = {f"appmanifest_{app_id}.acf", f"{app_id}.acf"}
+        found_for_app = None
+        for root, dirs, files in os.walk(working_dir):
+            for name in files:
+                if name in target_names:
+                    found_for_app = os.path.join(root, name)
+                    break
+            if found_for_app:
+                found_files.append(found_for_app)
                 break
     
     if found_files:
