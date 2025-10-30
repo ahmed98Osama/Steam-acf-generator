@@ -25,7 +25,12 @@ import platform
 # Configuration
 PRIMARY_URL = 'https://github.com/Sak32009/SKSAppManifestGenerator/releases/download/v2.0.3/SKSAppManifestGenerator_x64_v2.0.3.zip'
 FALLBACK_URL = 'https://github.com/ahmed98Osama/Steam-acf-generator/raw/master/SKSAppManifestGenerator_x64.exe'
-TOOL_DIR = './tools/SKSAppManifestGenerator'
+try:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    # __file__ is not defined inside interactive/Colab cells; use CWD
+    SCRIPT_DIR = os.getcwd()
+TOOL_DIR = os.path.join(SCRIPT_DIR, 'tools', 'SKSAppManifestGenerator')
 TOOL_NAME = 'SKSAppManifestGenerator_x64.exe'
 TOOL_PATH = os.path.join(TOOL_DIR, TOOL_NAME)
 ZIP_PASSWORD = b'cs.rin.ru'
@@ -280,7 +285,8 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
     os.makedirs(working_dir, exist_ok=True)
     
     # Build command
-    cmd = [tool_path]
+    executable_path = os.path.abspath(tool_path)
+    cmd = [executable_path]
     if debug:
         cmd.append('-d')
     cmd.extend(app_ids)
@@ -325,8 +331,11 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
                 print_warn(f"Generator returned code {result.returncode}")
                 print(stderr_text)
         except FileNotFoundError:
-            print_err("Cannot execute Windows executable on Linux.")
-            print_info("Please use the PowerShell script on Windows, or install Wine.")
+            print_err(f"Executable not found or not runnable: {executable_path}")
+            if platform.system().lower() != 'windows':
+                print_info("On Linux/macOS, please install Wine or run on Windows.")
+            else:
+                print_info("On Windows, ensure the file exists and antivirus is not blocking it.")
         except OSError as e:
             msg = str(e)
             if ('Exec format error' in msg or 'format error' in msg) and (not wine_cmd) and platform.system().lower() != 'windows':
@@ -378,12 +387,20 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
         print_warn("No ACF files detected. Check generator output above.")
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Steam ACF Generator wrapper for SKSAppManifestGenerator")
+    parser = argparse.ArgumentParser(description="Steam ACF Generator wrapper for SKSAppManifestGenerator", add_help=True)
     parser.add_argument("--GeneratorPath", dest="generator_path", help="Path to SKSAppManifestGenerator_x64.exe")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug output")
     parser.add_argument("--WorkingDirectory", dest="working_dir", help="Directory to output ACF files")
     parser.add_argument("--AppId", dest="app_id", help="App IDs string; accepts spaces/commas/mixed separators and non-ASCII digits")
-    return parser.parse_args()
+    # In notebook/Colab, IPython injects extra args (e.g., -f <kernel.json>)
+    # Use parse_known_args to ignore unknowns so running inside cells works.
+    args, unknown = parser.parse_known_args()
+    if unknown:
+        try:
+            print_warn(f"Ignoring unknown arguments (likely from IPython): {' '.join(unknown)}")
+        except Exception:
+            pass
+    return args
 
 
 def main():
