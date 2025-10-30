@@ -20,6 +20,7 @@ import shutil
 from pathlib import Path
 import argparse
 import unicodedata
+import platform
 
 # Configuration
 PRIMARY_URL = 'https://github.com/Sak32009/SKSAppManifestGenerator/releases/download/v2.0.3/SKSAppManifestGenerator_x64_v2.0.3.zip'
@@ -115,6 +116,32 @@ def find_executable(directory):
     for root, dirs, files in os.walk(directory):
         if TOOL_NAME in files:
             return os.path.join(root, TOOL_NAME)
+    return None
+
+def ensure_wine() -> str | None:
+    """Ensure Wine is available on Linux environments. Returns command name (wine/wine64) or None."""
+    system = platform.system().lower()
+    if 'windows' in system:
+        return None
+    # Check existing
+    for candidate in ('wine', 'wine64'):
+        if shutil.which(candidate):
+            return candidate
+    # Try to install via apt-get when available
+    print_info("Wine not detected. Attempting to install Wine...")
+    apt = shutil.which('apt-get')
+    try:
+        if apt:
+            subprocess.run([apt, 'update'], check=True)
+            subprocess.run([apt, 'install', '-y', 'wine', 'wine64'], check=True)
+    except Exception as e:
+        print_warn(f"Automatic Wine installation failed: {e}")
+    # Re-check
+    for candidate in ('wine', 'wine64'):
+        if shutil.which(candidate):
+            print_success(f"Wine installed: {candidate}")
+            return candidate
+    print_err("Wine is not available; cannot run Windows executables on this platform without Wine.")
     return None
 
 def setup_tool():
@@ -222,13 +249,14 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
         # On Linux/Colab, we'll attempt to use Wine if available
         # Otherwise, this will demonstrate the limitation
         print_info("Attempting to execute generator...")
+        wine_cmd = None
+        if platform.system().lower() != 'windows':
+            # Ensure Wine on non-Windows systems
+            wine_cmd = ensure_wine()
         
-        # Check if Wine is available (for Linux/Colab)
-        wine_available = shutil.which('wine') is not None
-        
-        if wine_available:
-            print_info("Wine detected. Using Wine to run Windows executable.")
-            cmd = ['wine'] + cmd
+        if wine_cmd:
+            print_info(f"Using {wine_cmd} to run Windows executable.")
+            cmd = [wine_cmd] + cmd
         
         # Attempt to run
         try:
@@ -242,6 +270,27 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
         except FileNotFoundError:
             print_err("Cannot execute Windows executable on Linux.")
             print_info("Please use the PowerShell script on Windows, or install Wine.")
+        except OSError as e:
+            msg = str(e)
+            if ('Exec format error' in msg or 'format error' in msg) and (not wine_cmd) and platform.system().lower() != 'windows':
+                # Retry with wine if not already used
+                for candidate in ('wine', 'wine64'):
+                    if shutil.which(candidate):
+                        try:
+                            result = subprocess.run([candidate] + cmd, capture_output=True, text=True, timeout=600)
+                            if result.returncode == 0:
+                                print_success("ACF files generated successfully!")
+                                print(result.stdout)
+                            else:
+                                print_warn(f"Generator returned code {result.returncode}")
+                                print(result.stderr)
+                            break
+                        except Exception as e2:
+                            print_err(f"Retry with {candidate} failed: {e2}")
+                else:
+                    print_err("Wine not available; cannot run Windows executable on this platform.")
+            else:
+                raise
         except subprocess.TimeoutExpired:
             print_err("Generator timed out")
     
