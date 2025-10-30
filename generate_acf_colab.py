@@ -68,18 +68,61 @@ def show_welcome():
     print("=" * 50 + "\n")
 
 def download_file(url, output_path, timeout=600):
-    """Download a file from URL"""
+    """Download a file from URL with multiple strategies (wget, curl, then requests)."""
     try:
         print_info(f"Downloading from: {url}")
+        # 1) Try wget
+        wget = shutil.which('wget') or shutil.which('wget.exe')
+        if wget:
+            tmp_out = output_path + '.part'
+            args = [
+                '--tries=3', '--timeout=20', '--read-timeout=20', '--no-verbose',
+                '-O', tmp_out, url
+            ]
+            proc = subprocess.run([wget] + args, capture_output=True, text=False)
+            if proc.returncode == 0 and os.path.exists(tmp_out) and os.path.getsize(tmp_out) > 0:
+                os.replace(tmp_out, output_path)
+                return True
+            else:
+                if os.path.exists(tmp_out):
+                    try:
+                        os.remove(tmp_out)
+                    except Exception:
+                        pass
+                print_warn(f"wget failed (code {proc.returncode if proc else 'N/A'}); trying curl...")
+
+        # 2) Try curl
+        curl = shutil.which('curl') or shutil.which('curl.exe')
+        if curl:
+            tmp_out = output_path + '.part'
+            args = [
+                '-fL', '--retry', '3', '--retry-delay', '2',
+                '--connect-timeout', '20', '--max-time', str(timeout),
+                '-A', 'Python-ACFDownloader/1.0',
+                '-o', tmp_out, url
+            ]
+            proc = subprocess.run([curl] + args, capture_output=True, text=False)
+            if proc.returncode == 0 and os.path.exists(tmp_out) and os.path.getsize(tmp_out) > 0:
+                os.replace(tmp_out, output_path)
+                return True
+            else:
+                if os.path.exists(tmp_out):
+                    try:
+                        os.remove(tmp_out)
+                    except Exception:
+                        pass
+                print_warn(f"curl failed (code {proc.returncode if proc else 'N/A'}); falling back to Python HTTP.")
+
+        # 3) Fallback: requests streaming
         headers = {"User-Agent": "Python-ACFDownloader/1.0"}
         response = requests.get(url, stream=True, headers=headers, timeout=timeout)
         response.raise_for_status()
-        
+
         total_size = int(response.headers.get('content-length', 0))
         downloaded = 0
-        
+
         with open(output_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
                 if chunk:
                     f.write(chunk)
                     downloaded += len(chunk)
@@ -87,7 +130,9 @@ def download_file(url, output_path, timeout=600):
                         percent = (downloaded / total_size) * 100
                         bar = _progress_bar(percent)
                         print(f"\r  {bar} {percent:5.1f}%", end='', flush=True)
-        print()  # New line after progress
+        if total_size > 0:
+            print(f"\r  {_progress_bar(100)} {100:5.1f}%", end='', flush=True)
+        print()
         return True
     except Exception as e:
         print_warn(f"Download failed: {str(e)}")
@@ -260,13 +305,15 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
         
         # Attempt to run
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            result = subprocess.run(cmd, capture_output=True, text=False, timeout=600)
+            stdout_text = (result.stdout or b'').decode('utf-8', errors='replace')
+            stderr_text = (result.stderr or b'').decode('utf-8', errors='replace')
             if result.returncode == 0:
                 print_success("ACF files generated successfully!")
-                print(result.stdout)
+                print(stdout_text)
             else:
                 print_warn(f"Generator returned code {result.returncode}")
-                print(result.stderr)
+                print(stderr_text)
         except FileNotFoundError:
             print_err("Cannot execute Windows executable on Linux.")
             print_info("Please use the PowerShell script on Windows, or install Wine.")
@@ -277,13 +324,15 @@ def generate_acf_files(tool_path, app_ids, debug=False, working_dir=None):
                 for candidate in ('wine', 'wine64'):
                     if shutil.which(candidate):
                         try:
-                            result = subprocess.run([candidate] + cmd, capture_output=True, text=True, timeout=600)
+                            result = subprocess.run([candidate] + cmd, capture_output=True, text=False, timeout=600)
+                            stdout_text = (result.stdout or b'').decode('utf-8', errors='replace')
+                            stderr_text = (result.stderr or b'').decode('utf-8', errors='replace')
                             if result.returncode == 0:
                                 print_success("ACF files generated successfully!")
-                                print(result.stdout)
+                                print(stdout_text)
                             else:
                                 print_warn(f"Generator returned code {result.returncode}")
-                                print(result.stderr)
+                                print(stderr_text)
                             break
                         except Exception as e2:
                             print_err(f"Retry with {candidate} failed: {e2}")
